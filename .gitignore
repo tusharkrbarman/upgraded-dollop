@@ -187,3 +187,6 @@ kafka/logs/
 uploads/
 downloads/
 cache/
+
+# OpenCode configuration
+.opencode/
