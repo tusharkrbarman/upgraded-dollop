@@ -182,11 +182,11 @@ class Config:
         return self.get('api.port', 5000)
 
     @property
-    api_debug(self):
+    def api_debug(self):
         return self.get('api.debug', False)
 
     @property
-    def_api_ssl(self):
+    def api_ssl(self):
         return self.get('api.ssl', True)
 
     @property

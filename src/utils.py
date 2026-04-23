@@ -31,8 +31,9 @@ def get_disk_speed():
     Measure disk write speed
     Returns speed in bytes per second
     """
+    import tempfile
     test_data = "test" * 1000000  # 4MB test data
-    temp_file = "/tmp/disk_speed_test.txt"
+    temp_file = os.path.join(tempfile.gettempdir(), 'disk_speed_test.txt')
 
     try:
         start_time = time.time()

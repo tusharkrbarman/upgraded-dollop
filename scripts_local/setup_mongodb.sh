@@ -167,7 +167,7 @@ Restart=always
 RestartSec=10
 
 [Install]
-WantedBy=multi-user-target
+WantedBy=multi-user.target
 EOF
 
 # Enable monitoring service
