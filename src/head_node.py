@@ -1,7 +1,7 @@
 """
 Head Node Application - Main Coordinator
 Handles API requests, coordinates workers, and manages training
-Uses FastAPI framework with SSL/TLS and JWT authentication
+Uses FastAPI framework with SSL/TLS
 """
 import os
 import sys
@@ -11,12 +11,10 @@ import logging
 import time
 from datetime import datetime, timedelta
 from typing import List, Dict, Optional
-from fastapi import FastAPI, HTTPException, UploadFile, File, Depends
+from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.responses import JSONResponse
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-import jwt
 from kafka import KafkaProducer
 from pymongo import MongoClient
 import pymongo
@@ -60,14 +58,6 @@ kafka_producer = None
 mongodb_client = None
 mongodb_db = None
 
-# JWT Configuration
-JWT_SECRET = config.api_jwt_secret
-JWT_ALGORITHM = config.api_jwt_algorithm
-JWT_EXPIRATION = config.api_jwt_expiration
-
-# Security
-security = HTTPBearer()
-
 
 # Pydantic models for request/response
 class FileUpload(BaseModel):
@@ -107,17 +97,6 @@ class StatsResponse(BaseModel):
     stats: Dict
 
 
-class LoginRequest(BaseModel):
-    username: str
-    password: str
-
-
-class LoginResponse(BaseModel):
-    status: str
-    token: str
-    expires_in: int
-
-
 def initialize_kafka():
     """Initialize Kafka producer with SSL"""
     global kafka_producer
@@ -154,32 +133,6 @@ def initialize_mongodb():
     except Exception as e:
         logger.error(f"Failed to initialize MongoDB: {e}")
         raise
-
-
-def create_jwt_token(username: str) -> str:
-    """Create JWT token for authentication"""
-    payload = {
-        "sub": username,
-        "exp": datetime.utcnow() + timedelta(seconds=JWT_EXPIRATION),
-        "iat": datetime.utcnow()
-    }
-    token = jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
-    return token
-
-
-def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)) -> Dict:
-    """Verify JWT token"""
-    try:
-        payload = jwt.decode(
-            credentials.credentials,
-            JWT_SECRET,
-            algorithms=[JWT_ALGORITHM]
-        )
-        return payload
-    except jwt.ExpiredSignatureError:
-        raise HTTPException(status_code=401, detail="Token expired")
-    except jwt.InvalidTokenError:
-        raise HTTPException(status_code=401, detail="Invalid token")
 
 
 def get_disk_speed():
@@ -306,25 +259,9 @@ async def health_check():
     )
 
 
-@app.post("/api/auth/login", response_model=LoginResponse)
-async def login(login_data: LoginRequest):
-    """Login endpoint to get JWT token"""
-    # In production, verify against database
-    # For demo, accept any username/password
-    if login_data.username and login_data.password:
-        token = create_jwt_token(login_data.username)
-        return LoginResponse(
-            status="success",
-            token=token,
-            expires_in=JWT_EXPIRATION
-        )
-    else:
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-
-
 @app.post("/api/upload", response_model=FileResponse)
-async def upload_file(file_data: FileUpload, token: dict = Depends(verify_token)):
-    """Upload file endpoint with JWT authentication"""
+async def upload_file(file_data: FileUpload):
+    """Upload file endpoint"""
     try:
         # Determine topic based on disk speed
         disk_speed = get_disk_speed()
@@ -359,8 +296,8 @@ async def upload_file(file_data: FileUpload, token: dict = Depends(verify_token)
 
 
 @app.get("/api/files", response_model=FilesListResponse)
-async def list_files(token: dict = Depends(verify_token)):
-    """List all files endpoint with JWT authentication"""
+async def list_files():
+    """List all files endpoint"""
     try:
         files = get_all_files()
         return FilesListResponse(
@@ -374,8 +311,8 @@ async def list_files(token: dict = Depends(verify_token)):
 
 
 @app.get("/api/files/{filename}")
-async def get_file(filename: str, token: dict = Depends(verify_token)):
-    """Get file endpoint with JWT authentication"""
+async def get_file(filename: str):
+    """Get file endpoint"""
     try:
         file_doc = get_file_location(filename)
 
@@ -401,8 +338,8 @@ async def get_file(filename: str, token: dict = Depends(verify_token)):
 
 
 @app.get("/api/workers", response_model=WorkerResponse)
-async def list_workers(token: dict = Depends(verify_token)):
-    """List all workers endpoint with JWT authentication"""
+async def list_workers():
+    """List all workers endpoint"""
     try:
         workers = get_worker_status()
         return WorkerResponse(
@@ -416,8 +353,8 @@ async def list_workers(token: dict = Depends(verify_token)):
 
 
 @app.get("/api/stats", response_model=StatsResponse)
-async def get_stats(token: dict = Depends(verify_token)):
-    """Get system statistics endpoint with JWT authentication"""
+async def get_stats():
+    """Get system statistics endpoint"""
     try:
         files = get_all_files()
         workers = get_worker_status()

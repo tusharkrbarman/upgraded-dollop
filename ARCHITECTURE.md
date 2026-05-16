@@ -62,7 +62,6 @@ Detailed architecture of the distributed AI training system.
 
 **Technology**:
 - FastAPI with SSL/TLS
-- JWT authentication
 - Kafka producer/consumer
 - MongoDB client
 
@@ -184,11 +183,6 @@ CA Certificate (ca.pem)
 
 ### Authentication
 
-**JWT Authentication**:
-- Token-based API authentication
-- 1-hour token expiration
-- Secret key signing
-
 **MongoDB Authentication**:
 - SCRAM-SHA-256
 - Role-based access control
@@ -201,8 +195,7 @@ CA Certificate (ca.pem)
 ### Authorization
 
 **API Endpoints**:
-- Public: `/health`, `/api/auth/login`
-- Protected: `/api/*` (requires JWT)
+- All endpoints are public (no authentication required)
 
 **MongoDB Roles**:
 - Admin: Full access
@@ -316,10 +309,7 @@ api:
   ssl: true
   cert_file: "/etc/ssl/certs/server-cert.pem"
   key_file: "/etc/ssl/certs/server-key.pem"
-  jwt:
-    secret: "your-jwt-secret"
-    algorithm: "HS256"
-    expiration: 3600
+  # Authentication removed for educational/demo purposes
 ```
 
 ## 🎯 Design Decisions
@@ -399,7 +389,7 @@ api:
 ### Security
 
 - **Encryption**: SSL/TLS for all communication
-- **Authentication**: JWT and MongoDB auth
+- **Authentication**: MongoDB auth only (API has no auth)
 - **Authorization**: Role-based access control
 - **Certificate Management**: PKI infrastructure
 

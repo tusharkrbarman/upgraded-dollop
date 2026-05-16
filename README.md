@@ -12,7 +12,7 @@ Distributes training data across 7 laptops on a local network based on device ca
 - **Fault Tolerance**: Detects and recovers from failures in <2 seconds
 - **High Availability**: 99.9% uptime with automatic failover
 - **Real-time Monitoring**: Heartbeat-based health monitoring
-- **Security**: SSL/TLS encryption + JWT authentication
+- **Security**: SSL/TLS encryption
 
 ## 🏗️ System Architecture
 
@@ -30,7 +30,7 @@ Distributes training data across 7 laptops on a local network based on device ca
 
 ### Technology Stack
 
-- **API**: FastAPI with SSL/TLS + JWT
+- **API**: FastAPI with SSL/TLS
 - **Messaging**: Apache Kafka 3.6.0 with SSL
 - **Database**: MongoDB 7.0 with authentication
 - **Language**: Python 3.11
@@ -95,19 +95,16 @@ Distributes training data across 7 laptops on a local network based on device ca
 # Health check
 GET /health
 
-# Upload file (requires JWT)
+# Upload file
 POST /api/upload
-Authorization: Bearer <token>
 Content-Type: application/json
 {"name": "image.jpg", "img": "base64data"}
 
-# List files (requires JWT)
+# List files
 GET /api/files
-Authorization: Bearer <token>
 
-# Get system stats (requires JWT)
+# Get system stats
 GET /api/stats
-Authorization: Bearer <token>
 ```
 
 ### Example Usage
@@ -116,24 +113,16 @@ Authorization: Bearer <token>
 import requests
 import base64
 
-# Get JWT token
-response = requests.post('https://192.168.1.10:5000/api/auth/login',
-    json={'username': 'admin', 'password': 'your-password'},
-    verify=False)
-token = response.json()['token']
-
 # Upload file
 with open('image.jpg', 'rb') as f:
     img_data = base64.b64encode(f.read()).decode('utf-8')
 
 response = requests.post('https://192.168.1.10:5000/api/upload',
     json={'name': 'image.jpg', 'img': img_data},
-    headers={'Authorization': f'Bearer {token}'},
     verify=False)
 
 # List files
 response = requests.get('https://192.168.1.10:5000/api/files',
-    headers={'Authorization': f'Bearer {token}'},
     verify=False)
 ```
 
@@ -188,20 +177,17 @@ mongodb:
   auth_source: "admin"
 
 # API
-api:
-  host: "0.0.0.0"
-  port: 5000
-  ssl: true
-  jwt:
-    secret: "your-jwt-secret"
-    expiration: 3600
+  api:
+    host: "0.0.0.0"
+    port: 5000
+    ssl: true
 ```
 
 ## 🎓 Educational Value
 
 Demonstrates:
 - **Distributed Systems**: Message passing, coordination, fault tolerance
-- **Security**: SSL/TLS, JWT authentication, MongoDB auth
+- **Security**: SSL/TLS, MongoDB auth
 - **Microservices**: Service-oriented architecture
 - **Load Balancing**: Intelligent resource allocation
 - **High Availability**: Automatic failover and recovery

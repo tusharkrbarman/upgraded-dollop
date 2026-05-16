@@ -202,18 +202,6 @@ class Config:
         return self.get('api.cors_origins', ['http://localhost:5000', 'http://192.168.1.10:5000'])
 
     @property
-    def api_jwt_secret(self):
-        return self.get('api.jwt.secret', 'your-jwt-secret-change-this')
-
-    @property
-    def api_jwt_algorithm(self):
-        return self.get('api.jwt.algorithm', 'HS256')
-
-    @property
-    def api_jwt_expiration(self):
-        return self.get('api.jwt.expiration', 7200)
-
-    @property
     def monitoring_enabled(self):
         return self.get('monitoring.enabled', True)
 
