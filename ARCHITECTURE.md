@@ -4,7 +4,7 @@ Detailed architecture of the distributed AI training system.
 
 ## 🌐 System Overview
 
-7 laptops on local network (192.168.1.0/24) distributing ML training data with fault tolerance and security.
+7 laptops on a trusted local network (192.168.1.0/24) distributing ML training data with fault tolerance and simple authentication.
 
 ## 🏗️ Architecture Diagram
 
@@ -61,12 +61,12 @@ Detailed architecture of the distributed AI training system.
 - Provide monitoring dashboard
 
 **Technology**:
-- FastAPI with SSL/TLS
+- FastAPI
 - Kafka producer/consumer
 - MongoDB client
 
 **Ports**:
-- 5000 (HTTPS API)
+- 5000 (HTTP API)
 
 ### 2. Kafka Brokers (Laptops 2, 3)
 
@@ -80,7 +80,7 @@ Detailed architecture of the distributed AI training system.
 
 **Technology**:
 - Apache Kafka 3.6.0
-- SSL/TLS encryption
+- Plaintext local LAN messaging
 - Replication factor: 2
 - Partitions: 3
 
@@ -90,7 +90,7 @@ Detailed architecture of the distributed AI training system.
 - `heartbeat`: Worker health checks
 
 **Ports**:
-- 9092 (Kafka SSL)
+- 9092 (Kafka)
 - 2181 (Zookeeper)
 
 ### 3. Workers (Laptops 4, 5, 6)
@@ -129,7 +129,6 @@ Detailed architecture of the distributed AI training system.
 
 **Technology**:
 - MongoDB 7.0
-- SSL/TLS encryption
 - Authentication enabled
 
 **Collections**:
@@ -139,7 +138,7 @@ Detailed architecture of the distributed AI training system.
 - `tasks`: Task status
 
 **Ports**:
-- 27017 (MongoDB SSL)
+- 27017 (MongoDB)
 
 ### 5. Monitoring (Laptop 7)
 
@@ -167,19 +166,10 @@ Detailed architecture of the distributed AI training system.
 
 ## 🔒 Security Architecture
 
-### SSL/TLS Encryption
+### Local Network Security
 
-**Certificate Hierarchy**:
-```
-CA Certificate (ca.pem)
-├── Server Certificate (server-cert.pem)
-└── Client Certificate (client-cert.pem)
-```
-
-**Encryption Scope**:
-- API communication (HTTPS)
-- Kafka messaging (SSL)
-- MongoDB connections (TLS)
+TLS is disabled for local deployment to keep setup manageable across seven laptops.
+Use this configuration only on a trusted LAN.
 
 ### Authentication
 
@@ -188,9 +178,8 @@ CA Certificate (ca.pem)
 - Role-based access control
 - Admin and application users
 
-**Kafka Authentication**:
-- SSL certificate-based
-- Mutual TLS (mTLS)
+**Heartbeat Authentication**:
+- Shared heartbeat auth token
 
 ### Authorization
 
@@ -206,7 +195,7 @@ CA Certificate (ca.pem)
 ### Training Request Flow
 
 ```
-1. Client → Head Node (HTTPS)
+1. Client → Head Node (HTTP)
    POST /api/upload
    {name, img_data}
 
@@ -267,7 +256,7 @@ CA Certificate (ca.pem)
 network:
   type: "local"
   subnet: "192.168.1.0/24"
-  use_ssl: true
+  use_ssl: false
   use_auth: true
 ```
 
@@ -279,8 +268,7 @@ kafka:
     - "192.168.1.11:9092"
     - "192.168.1.12:9092"
   security:
-    protocol: "SSL"
-    ca_file: "/etc/ssl/certs/ca.pem"
+    protocol: "PLAINTEXT"
   topics:
     image_data_fast: "image-data-fast"
     image_data_slow: "image-data-slow"
@@ -295,9 +283,8 @@ kafka:
 mongodb:
   uri: "mongodb://username:password@192.168.1.16:27017/"
   database: "dfs_metadata"
-  ssl: true
-  ca_file: "/etc/ssl/certs/ca.pem"
-  auth_source: "admin"
+  ssl: false
+  auth_source: "dfs_metadata"
 ```
 
 ### API Configuration
@@ -306,9 +293,7 @@ mongodb:
 api:
   host: "0.0.0.0"
   port: 5000
-  ssl: true
-  cert_file: "/etc/ssl/certs/server-cert.pem"
-  key_file: "/etc/ssl/certs/server-key.pem"
+  ssl: false
   # Authentication removed for educational/demo purposes
 ```
 
@@ -335,12 +320,12 @@ api:
 - **Firewall Friendly**: Easier to configure
 - **Sufficient**: Heartbeats don't need reliability
 
-### Why SSL/TLS on Local Network?
+### Why Disable TLS on Local Network?
 
-- **Educational Value**: Demonstrates security best practices
-- **Real-World Scenario**: Production systems always use security
-- **Data Protection**: Protects training data and metadata
-- **Future-Proof**: Ready for internet deployment
+- **Simpler Deployment**: No certificate generation or distribution
+- **Fewer Failure Modes**: Kafka and MongoDB setup is easier to debug
+- **Good Fit for Demo**: Appropriate for a trusted classroom or lab LAN
+- **Clear Tradeoff**: Not intended for internet or untrusted networks
 
 ## 📈 Performance Characteristics
 
@@ -388,7 +373,7 @@ api:
 
 ### Security
 
-- **Encryption**: SSL/TLS for all communication
+- **Authentication**: MongoDB auth and heartbeat token for local deployment
 - **Authentication**: MongoDB auth only (API has no auth)
 - **Authorization**: Role-based access control
 - **Certificate Management**: PKI infrastructure

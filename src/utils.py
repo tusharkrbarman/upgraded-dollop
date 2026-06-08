@@ -58,7 +58,15 @@ def get_mongodb_connection():
     Returns tuple of (client, database)
     """
     try:
-        client = MongoClient(config.mongodb_uri)
+        mongo_options = {'authSource': config.mongodb_auth_source}
+        if config.mongodb_ssl:
+            mongo_options.update({
+                'ssl': True,
+                'ssl_ca_certs': config.mongodb_ca_file,
+                'tlsAllowInvalidHostnames': not config.security_ssl_check_hostname
+            })
+
+        client = MongoClient(config.mongodb_uri, **mongo_options)
         db = client[config.mongodb_database]
         logger = logging.getLogger(__name__)
         logger.info("MongoDB connection initialized successfully")

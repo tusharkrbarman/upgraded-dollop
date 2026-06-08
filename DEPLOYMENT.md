@@ -69,53 +69,7 @@ ping 192.168.1.15
 ping 192.168.1.16
 ```
 
-### Step 2: Generate SSL Certificates (Laptop 1)
-
-```bash
-# Create SSL directory
-mkdir -p ~/ssl-certs
-cd ~/ssl-certs
-
-# Generate CA certificate
-openssl genrsa -out ca-key.pem 4096
-openssl req -new -x509 -days 365 -key ca-key.pem -sha256 -out ca.pem -subj "/CN=DistributedAI-CA"
-
-# Generate server certificates
-openssl genrsa -out server-key.pem 4096
-openssl req -new -key server-key.pem -out server.csr -subj "/CN=server"
-openssl x509 -req -in server.csr -CA ca.pem -CAkey ca-key.pem -CAcreateserial -out server-cert.pem -days 365
-
-# Generate client certificates
-openssl genrsa -out client-key.pem 4096
-openssl req -new -key client-key.pem -out client.csr -subj "/CN=client"
-openssl x509 -req -in client.csr -CA ca.pem -CAkey ca-key.pem -CAcreateserial -out client-cert.pem -days 365
-
-# Set permissions
-chmod 600 *.pem
-```
-
-### Step 3: Distribute Certificates
-
-```bash
-# Copy certificates to all laptops
-# Use scp, USB drive, or file sharing
-
-# Each laptop needs:
-# - ca.pem (CA certificate)
-# - client-cert.pem (client certificate)
-# - client-key.pem (client private key)
-
-# Laptop 1 also needs:
-# - server-cert.pem (server certificate)
-# - server-key.pem (server private key)
-
-# Example using scp:
-scp ~/ssl-certs/ca.pem user@192.168.1.11:~/ssl-certs/
-scp ~/ssl-certs/client-cert.pem user@192.168.1.11:~/ssl-certs/
-scp ~/ssl-certs/client-key.pem user@192.168.1.11:~/ssl-certs/
-```
-
-### Step 4: Setup MongoDB (Laptop 7)
+### Step 2: Setup MongoDB (Laptop 7)
 
 ```bash
 # Install MongoDB
@@ -124,7 +78,12 @@ echo "deb [ arch=amd64,arm64 ] https://repo.mongodb.org/apt/ubuntu jammy/mongodb
 sudo apt update
 sudo apt install -y mongodb-org
 
-# Start MongoDB without auth
+# Enable authentication
+sudo nano /etc/mongod.conf
+# Add:
+# security.authorization: enabled
+
+# Start MongoDB
 sudo systemctl start mongod
 
 # Create admin user
@@ -145,18 +104,9 @@ db.createUser({
 })
 '
 
-# Stop MongoDB
-sudo systemctl stop mongod
-
-# Enable authentication
-sudo nano /etc/mongod.conf
-# Add: security.authorization: enabled
-
-# Start MongoDB
-sudo systemctl start mongod
 ```
 
-### Step 5: Setup Kafka Brokers (Laptops 2, 3)
+### Step 3: Setup Kafka Brokers (Laptops 2, 3)
 
 #### Laptop 2 (Broker 1)
 
@@ -180,14 +130,8 @@ clientPort=2181
 nano ~/kafka/config/server.properties
 # Add/update:
 broker.id=1
-listeners=SSL://:9092
-advertised.listeners=SSL://192.168.1.11:9092
-ssl.keystore.location=/path/to/keystore.jks
-ssl.keystore.password=your-password
-ssl.key.password=your-password
-ssl.truststore.location=/path/to/truststore.jks
-ssl.truststore.password=your-password
-security.inter.broker.protocol=SSL
+listeners=PLAINTEXT://:9092
+advertised.listeners=PLAINTEXT://192.168.1.11:9092
 
 # Start Zookeeper
 ~/kafka/bin/zookeeper-server-start.sh -daemon ~/kafka/config/zookeeper.properties
@@ -201,10 +145,10 @@ security.inter.broker.protocol=SSL
 ```bash
 # Same as Laptop 2, but with:
 broker.id=2
-advertised.listeners=SSL://192.168.1.12:9092
+advertised.listeners=PLAINTEXT://192.168.1.12:9092
 ```
 
-### Step 6: Setup Workers (Laptops 4, 5, 6)
+### Step 4: Setup Workers (Laptops 4, 5, 6)
 
 ```bash
 # Install Python
@@ -221,11 +165,6 @@ source venv/bin/activate
 
 # Install dependencies
 pip install -r requirements.txt
-
-# Copy certificates
-sudo mkdir -p /etc/ssl/certs
-sudo cp ~/ssl-certs/*.pem /etc/ssl/certs/
-sudo chmod 600 /etc/ssl/certs/*.pem
 
 # Update config
 nano config_local.yaml
@@ -235,7 +174,7 @@ nano config_local.yaml
 python src/worker.py
 ```
 
-### Step 7: Setup Head Node (Laptop 1)
+### Step 5: Setup Head Node (Laptop 1)
 
 ```bash
 # Install Python
@@ -253,11 +192,6 @@ source venv/bin/activate
 # Install dependencies
 pip install -r requirements.txt
 
-# Copy certificates
-sudo mkdir -p /etc/ssl/certs
-sudo cp ~/ssl-certs/*.pem /etc/ssl/certs/
-sudo chmod 600 /etc/ssl/certs/*.pem
-
 # Update config
 nano config_local.yaml
 # Update IP addresses and passwords
@@ -266,7 +200,7 @@ nano config_local.yaml
 python src/head_node.py
 ```
 
-### Step 8: Setup Monitoring (Laptop 7)
+### Step 6: Setup Monitoring (Laptop 7)
 
 ```bash
 # Already have Python and MongoDB installed
@@ -287,46 +221,25 @@ telnet 192.168.1.11 9092
 telnet 192.168.1.12 9092
 
 # Test MongoDB
-mongosh "mongodb://appuser:your-password@192.168.1.16:27017/?ssl=true&sslCAFile=/etc/ssl/certs/ca.pem"
+mongosh "mongodb://appuser:your-password@192.168.1.16:27017/dfs_metadata?authSource=dfs_metadata"
 
 # Test API
-curl -k https://192.168.1.10:5000/health
-```
-
-### Test Security
-
-```bash
-# Test SSL
-openssl s_client -connect 192.168.1.10:5000 -showcerts
-
-# Test authentication
-curl -k -X POST https://192.168.1.10:5000/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"username":"admin","password":"your-password"}'
+curl http://192.168.1.10:5000/health
 ```
 
 ### Test End-to-End
 
 ```bash
-# 1. Get JWT token
-TOKEN=$(curl -k -X POST https://192.168.1.10:5000/api/auth/login \
+# 1. Upload file
+curl -X POST http://192.168.1.10:5000/api/upload \
   -H "Content-Type: application/json" \
-  -d '{"username":"admin","password":"your-password"}' \
-  | jq -r '.token')
-
-# 2. Upload file
-curl -k -X POST https://192.168.1.10:5000/api/upload \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $TOKEN" \
   -d '{"name":"test.jpg","img":"base64data"}'
 
-# 3. List files
-curl -k https://192.168.1.10:5000/api/files \
-  -H "Authorization: Bearer $TOKEN"
+# 2. List files
+curl http://192.168.1.10:5000/api/files
 
-# 4. Check stats
-curl -k https://192.168.1.10:5000/api/stats \
-  -H "Authorization: Bearer $TOKEN"
+# 3. Check stats
+curl http://192.168.1.10:5000/api/stats
 ```
 
 ## 🔧 Troubleshooting
@@ -354,16 +267,6 @@ sudo ufw status
 sudo systemctl status <service-name>
 ```
 
-### SSL Errors
-
-```bash
-# Verify certificates
-openssl x509 -in /etc/ssl/certs/ca.pem -text -noout
-
-# Check certificate paths
-ls -la /etc/ssl/certs/
-```
-
 ## 📋 Deployment Checklist
 
 ### Before Deployment
@@ -380,10 +283,8 @@ ls -la /etc/ssl/certs/
 - [ ] Required ports open
 
 ### Security Setup
-- [ ] SSL certificates generated
-- [ ] Certificates distributed
 - [ ] MongoDB authentication configured
-- [ ] Kafka SSL configured
+- [ ] Kafka brokers configured
 
 ### Service Deployment
 - [ ] MongoDB running (Laptop 7)
@@ -401,7 +302,7 @@ ls -la /etc/ssl/certs/
 
 ✅ All 7 laptops communicate
 ✅ Data flows correctly
-✅ Security implemented (SSL/TLS, auth)
+✅ Security implemented for local demo (MongoDB auth)
 ✅ Fault tolerance working
 ✅ Monitoring operational
 

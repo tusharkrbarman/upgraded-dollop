@@ -48,35 +48,10 @@ pip install -r requirements.txt
 echo "Creating directories..."
 mkdir -p logs
 mkdir -p data
-mkdir -p /etc/ssl/certs
 
 # Copy configuration
 echo "Setting up configuration..."
 cp config_local.yaml config.yaml
-
-# Setup SSL certificates
-echo "Setting up SSL certificates..."
-mkdir -p ~/ssl-certs
-cd ~/ssl-certs
-
-# Check if certificates already exist
-if [ ! -f "ca.pem" ]; then
-    echo "Certificates not found. Please copy certificates from Head Node (Laptop 1):"
-    echo "  scp user@192.168.1.10:~/ssl-certs/ca.pem ~/ssl-certs/"
-    echo "  scp user@192.168.1.10:~/ssl-certs/client-cert.pem ~/ssl-certs/"
-    echo "  scp user@192.168.1.10:~/ssl-certs/client-key.pem ~/ssl-certs/"
-    exit 1
-fi
-
-# Copy certificates to system directory
-echo "Copying certificates to system directory..."
-cp ca.pem /etc/ssl/certs/
-cp client-cert.pem /etc/ssl/certs/
-cp client-key.pem /etc/ssl/certs/
-
-# Set permissions
-chmod 600 /etc/ssl/certs/*.pem
-chmod 644 /etc/ssl/certs/ca.pem
 
 # Configure MongoDB
 echo "Configuring MongoDB..."
@@ -183,7 +158,7 @@ echo "IMPORTANT NOTES:"
 echo "1. Your IP: 192.168.1.16"
 echo "2. MongoDB Port: 27017"
 echo "3. Monitoring Port: 9999"
-echo "4. SSL certificates installed in /etc/ssl/certs/"
+echo "4. TLS disabled for local network deployment"
 echo ""
 echo "MongoDB Users Created:"
 echo "  - admin (root access)"
@@ -206,11 +181,10 @@ echo "To view monitoring logs:"
 echo "  sudo journalctl -u monitoring -f"
 echo ""
 echo "To connect to MongoDB:"
-echo "  mongosh 'mongodb://appuser:your-password@192.168.1.16:27017/?ssl=true&sslCAFile=/etc/ssl/certs/ca.pem'"
+echo "  mongosh 'mongodb://appuser:your-password@192.168.1.16:27017/dfs_metadata?authSource=dfs_metadata'"
 echo ""
 echo "NEXT STEPS:"
-echo "1. Ensure certificates are copied from Head Node (Laptop 1)"
-echo "2. Update config.yaml on other laptops with this laptop's IP"
-echo "3. Start monitoring service"
-echo "4. Verify MongoDB is accessible from other laptops"
-echo "5. Verify monitoring is receiving heartbeats from workers"
+echo "1. Update config.yaml on other laptops with this laptop's IP"
+echo "2. Start monitoring service"
+echo "3. Verify MongoDB is accessible from other laptops"
+echo "4. Verify monitoring is receiving heartbeats from workers"

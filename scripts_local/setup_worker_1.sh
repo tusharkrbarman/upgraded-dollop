@@ -42,35 +42,10 @@ echo "Creating directories..."
 mkdir -p storage/worker-1
 mkdir -p logs
 mkdir -p data
-mkdir -p /etc/ssl/certs
 
 # Copy configuration
 echo "Setting up configuration..."
 cp config_local.yaml config.yaml
-
-# Setup SSL certificates
-echo "Setting up SSL certificates..."
-mkdir -p ~/ssl-certs
-cd ~/ssl-certs
-
-# Check if certificates already exist
-if [ ! -f "ca.pem" ]; then
-    echo "Certificates not found. Please copy certificates from Head Node (Laptop 1):"
-    echo "  scp user@192.168.1.10:~/ssl-certs/ca.pem ~/ssl-certs/"
-    echo "  scp user@192.168.1.10:~/ssl-certs/client-cert.pem ~/ssl-certs/"
-    echo "  scp user@192.168.1.10:~/ssl-certs/client-key.pem ~/ssl-certs/"
-    exit 1
-fi
-
-# Copy certificates to system directory
-echo "Copying certificates to system directory..."
-cp ca.pem /etc/ssl/certs/
-cp client-cert.pem /etc/ssl/certs/
-cp client-key.pem /etc/ssl/certs/
-
-# Set permissions
-chmod 600 /etc/ssl/certs/*.pem
-chmod 644 /etc/ssl/certs/ca.pem
 
 # Configure firewall
 echo "Configuring firewall..."
@@ -116,7 +91,7 @@ echo "IMPORTANT NOTES:"
 echo "1. Your IP: 192.168.1.13"
 echo "2. Worker ID: worker-1"
 echo "3. Worker Type: Fast (will be determined at runtime)"
-echo "4. SSL certificates installed in /etc/ssl/certs/"
+echo "4. TLS disabled for local network deployment"
 echo ""
 echo "To start the worker:"
 echo "  sudo systemctl start worker"
@@ -128,9 +103,8 @@ echo "To view logs:"
 echo "  sudo journalctl -u worker -f"
 echo ""
 echo "NEXT STEPS:"
-echo "1. Ensure certificates are copied from Head Node (Laptop 1)"
-echo "2. Update config.yaml with correct IP addresses"
-echo "3. Start Kafka brokers first"
-echo "4. Start MongoDB"
-echo "5. Then start this worker"
-echo "6. Verify worker is consuming messages from Kafka"
+echo "1. Update config.yaml with correct IP addresses"
+echo "2. Start Kafka brokers first"
+echo "3. Start MongoDB"
+echo "4. Then start this worker"
+echo "5. Verify worker is consuming messages from Kafka"

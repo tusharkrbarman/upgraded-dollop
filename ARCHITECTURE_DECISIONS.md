@@ -103,27 +103,26 @@ Use UDP instead of TCP, HTTP, or Kafka for heartbeats.
 
 ---
 
-## ADR-005: SSL/TLS for All Communication
+## ADR-005: Disable TLS for Local Network Deployment
 
 **Status:** ✅ Accepted
 
 **Context:**
-Even though this runs on a local network, we want to demonstrate production security practices.
+The project runs on a trusted local network for a college assignment. TLS made the seven-laptop setup significantly harder to deploy and debug.
 
 **Decision:**
-Use SSL/TLS encryption for API, Kafka, and MongoDB connections.
+Disable TLS for the local network deployment. Keep MongoDB authentication and heartbeat tokens.
 
 **Rationale:**
-- **Educational value:** Demonstrates real-world security
-- **Data protection:** Prevents eavesdropping on training data
-- **Future-proof:** Can extend to internet deployment
-- **Assignment requirement:** Shows understanding of security
+- **Deployment simplicity:** No certificate generation or distribution
+- **Fewer failure modes:** Kafka and MongoDB are easier to configure
+- **Good fit:** Appropriate for a trusted classroom or lab LAN
+- **Still authenticated:** MongoDB auth and heartbeat tokens remain
 
 **Consequences:**
-- Certificate management complexity
-- Need to distribute CA cert to all nodes
-- Slight performance overhead (negligible on LAN)
-- Certificate expiration requires rotation
+- Traffic is not encrypted on the LAN
+- Not suitable for internet or untrusted networks
+- Internet deployment should re-enable TLS
 
 ---
 
@@ -332,7 +331,7 @@ Provide separate bash setup scripts for each role (`setup_head_node.sh`, `setup_
 | 002 | Apache Kafka | ✅ Accepted | High |
 | 003 | MongoDB | ✅ Accepted | High |
 | 004 | UDP Heartbeats | ✅ Accepted | Medium |
-| 005 | SSL/TLS Everywhere | ✅ Accepted | Medium |
+| 005 | Disable Local TLS | ✅ Accepted | Medium |
 | 006 | No JWT Auth | ✅ Accepted | Low |
 | 007 | Static IPs | ✅ Accepted | Medium |
 | 008 | 7-Node Topology | ✅ Accepted | High |

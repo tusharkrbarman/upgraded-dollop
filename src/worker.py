@@ -1,7 +1,6 @@
 """
 Consumer Worker Application
 Processes images from Kafka and stores them locally
-Uses SSL/TLS for secure communication
 """
 import os
 import sys
@@ -79,40 +78,51 @@ def determine_topic(worker_type):
 
 
 def initialize_kafka(topic):
-    """Initialize Kafka consumer with SSL"""
+    """Initialize Kafka consumer"""
     global kafka_consumer
     try:
+        kafka_options = {
+            'bootstrap_servers': config.kafka_bootstrap_servers,
+            'value_deserializer': lambda m: json.loads(m.decode('utf-8')),
+            'auto_offset_reset': 'earliest',
+            'group_id': f"{worker_type}-workers-group",
+            'enable_auto_commit': True,
+            'security_protocol': config.kafka_security_protocol
+        }
+        if config.kafka_security_protocol.upper() == 'SSL':
+            kafka_options.update({
+                'ssl_cafile': config.kafka_security_ca_file,
+                'ssl_certfile': config.kafka_security_cert_file,
+                'ssl_keyfile': config.kafka_security_key_file,
+                'ssl_password': config.kafka_security_password,
+                'ssl_check_hostname': config.security_ssl_check_hostname
+            })
+
         kafka_consumer = KafkaConsumer(
-            bootstrap_servers=config.kafka_bootstrap_servers,
-            value_deserializer=lambda m: json.loads(m.decode('utf-8')),
-            auto_offset_reset='earliest',
-            group_id=f"{worker_type}-workers-group",
-            enable_auto_commit=True,
-            security_protocol=config.kafka_security_protocol,
-            ssl_cafile=config.kafka_security_ca_file,
-            ssl_certfile=config.kafka_security_cert_file,
-            ssl_keyfile=config.kafka_security_key_file,
-            ssl_password=config.kafka_security_password
+            **kafka_options
         )
         kafka_consumer.subscribe([topic])
-        logger.info(f"Kafka consumer initialized for topic: {topic} with SSL")
+        logger.info(f"Kafka consumer initialized for topic: {topic} using {config.kafka_security_protocol}")
     except Exception as e:
         logger.error(f"Failed to initialize Kafka consumer: {e}")
         raise
 
 
 def initialize_mongodb():
-    """Initialize MongoDB connection with SSL"""
+    """Initialize MongoDB connection"""
     global mongodb_client, mongodb_db
     try:
-        mongodb_client = MongoClient(
-            config.mongodb_uri,
-            ssl=config.mongodb_ssl,
-            ssl_ca_certs=config.mongodb_ca_file,
-            authSource=config.mongodb_auth_source
-        )
+        mongo_options = {'authSource': config.mongodb_auth_source}
+        if config.mongodb_ssl:
+            mongo_options.update({
+                'ssl': True,
+                'ssl_ca_certs': config.mongodb_ca_file,
+                'tlsAllowInvalidHostnames': not config.security_ssl_check_hostname
+            })
+
+        mongodb_client = MongoClient(config.mongodb_uri, **mongo_options)
         mongodb_db = mongodb_client[config.mongodb_database]
-        logger.info("MongoDB connection initialized successfully with SSL")
+        logger.info("MongoDB connection initialized successfully")
     except Exception as e:
         logger.error(f"Failed to initialize MongoDB: {e}")
         raise

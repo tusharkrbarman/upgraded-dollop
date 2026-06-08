@@ -39,17 +39,20 @@ last_heartbeat = defaultdict(datetime)
 
 
 def initialize_mongodb():
-    """Initialize MongoDB connection with SSL"""
+    """Initialize MongoDB connection"""
     global mongodb_client, mongodb_db
     try:
-        mongodb_client = MongoClient(
-            config.mongodb_uri,
-            ssl=config.mongodb_ssl,
-            ssl_ca_certs=config.mongodb_ca_file,
-            authSource=config.mongodb_auth_source
-        )
+        mongo_options = {'authSource': config.mongodb_auth_source}
+        if config.mongodb_ssl:
+            mongo_options.update({
+                'ssl': True,
+                'ssl_ca_certs': config.mongodb_ca_file,
+                'tlsAllowInvalidHostnames': not config.security_ssl_check_hostname
+            })
+
+        mongodb_client = MongoClient(config.mongodb_uri, **mongo_options)
         mongodb_db = mongodb_client[config.mongodb_database]
-        logger.info("MongoDB connection initialized successfully with SSL")
+        logger.info("MongoDB connection initialized successfully")
     except Exception as e:
         logger.error(f"Failed to initialize MongoDB: {e}")
         raise
@@ -59,7 +62,7 @@ def update_node_status(heartbeat_data):
     """Update node status in memory and MongoDB"""
     try:
         node_id = heartbeat_data['node_id']
-        timestamp = datetime.fromtimestamp(heartbeat_data['timestamp'])
+        timestamp = datetime.utcfromtimestamp(heartbeat_data['timestamp'])
 
         # Verify authentication token
         expected_token = config.heartbeat_auth_token

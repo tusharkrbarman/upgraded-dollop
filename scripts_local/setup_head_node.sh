@@ -42,49 +42,10 @@ echo "Creating directories..."
 mkdir -p storage
 mkdir -p logs
 mkdir -p data
-mkdir -p /etc/ssl/certs
 
 # Copy configuration
 echo "Setting up configuration..."
 cp config_local.yaml config.yaml
-
-# Setup SSL certificates
-echo "Setting up SSL certificates..."
-mkdir -p ~/ssl-certs
-cd ~/ssl-certs
-
-# Generate CA certificate
-echo "Generating CA certificate..."
-openssl genrsa -out ca-key.pem 4096
-openssl req -new -x509 -days 365 -key ca-key.pem -sha256 -out ca.pem -subj "/CN=DistributedAI-CA"
-
-# Generate server certificates
-echo "Generating server certificates..."
-openssl genrsa -out server-key.pem 4096
-openssl req -new -key server-key.pem -out server.csr -subj "/CN=server"
-openssl x509 -req -in server.csr -CA ca.pem -CAkey ca-key.pem -CAcreateserial -out server-cert.pem -days 365
-
-# Generate client certificates
-echo "Generating client certificates..."
-openssl genrsa -out client-key.pem 4096
-openssl req -new -key client-key.pem -out client.csr -subj "/CN=client"
-openssl x509 -req -in client.csr -CA ca.pem -CAkey ca-key.pem -CAcreateserial -out client-cert.pem -days 365
-
-# Set permissions
-chmod 600 *.pem
-chmod 644 ca.pem
-
-# Copy certificates to system directory
-echo "Copying certificates to system directory..."
-cp ca.pem /etc/ssl/certs/
-cp server-cert.pem /etc/ssl/certs/
-cp server-key.pem /etc/ssl/certs/
-cp client-cert.pem /etc/ssl/certs/
-cp client-key.pem /etc/ssl/certs/
-
-# Set system permissions
-chmod 600 /etc/ssl/certs/*.pem
-chmod 644 /etc/ssl/certs/ca.pem
 
 # Configure firewall
 echo "Configuring firewall..."
@@ -124,9 +85,8 @@ echo "=========================================="
 echo ""
 echo "IMPORTANT NOTES:"
 echo "1. Your IP: 192.168.1.10"
-echo "2. SSL certificates installed in /etc/ssl/certs/"
-echo "3. CA certificate: /etc/ssl/certs/ca.pem"
-echo "4. Firewall configured"
+echo "2. TLS disabled for local network deployment"
+echo "3. Firewall configured"
 echo ""
 echo "To start the head node:"
 echo "  sudo systemctl start head-node"
@@ -137,17 +97,9 @@ echo ""
 echo "To view logs:"
 echo "  sudo journalctl -u head-node -f"
 echo ""
-echo "API will be available at: https://192.168.1.10:5000"
-echo "API Documentation: https://192.168.1.10:5000/docs"
+echo "API will be available at: http://192.168.1.10:5000"
+echo "API Documentation: http://192.168.1.10:5000/docs"
 echo ""
 echo "NEXT STEPS:"
-echo "1. Share CA certificate (/etc/ssl/certs/ca.pem) with other laptops"
-echo "2. Share client certificates with other laptops"
-echo "3. Update config.yaml on other laptops with this laptop's IP"
-echo "4. Test connectivity from other laptops"
-echo ""
-echo "To share certificates with other laptops:"
-echo "  scp /etc/ssl/certs/ca.pem user@192.168.1.11:~/"
-echo "  scp /etc/ssl/certs/client-cert.pem user@192.168.1.11:~/"
-echo "  scp /etc/ssl/certs/client-key.pem user@192.168.1.11:~/"
-echo "  (Repeat for all other laptops)"
+echo "1. Update config.yaml on other laptops with this laptop's IP"
+echo "2. Test connectivity from other laptops"

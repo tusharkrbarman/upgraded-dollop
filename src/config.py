@@ -91,7 +91,7 @@ class Config:
 
     @property
     def kafka_security_protocol(self):
-        return self.get('kafka.security.protocol', 'SSL')
+        return self.get('kafka.security.protocol', 'PLAINTEXT')
 
     @property
     def kafka_security_ca_file(self):
@@ -123,7 +123,7 @@ class Config:
 
     @property
     def mongodb_ssl(self):
-        return self.get('mongodb.ssl', True)
+        return self.get('mongodb.ssl', False)
 
     @property
     def mongodb_ca_file(self):
@@ -187,7 +187,7 @@ class Config:
 
     @property
     def api_ssl(self):
-        return self.get('api.ssl', True)
+        return self.get('api.ssl', False)
 
     @property
     def api_cert_file(self):
@@ -200,6 +200,10 @@ class Config:
     @property
     def api_cors_origins(self):
         return self.get('api.cors_origins', ['http://localhost:5000', 'http://192.168.1.10:5000'])
+
+    @property
+    def security_ssl_check_hostname(self):
+        return self.get('security.ssl_check_hostname', True)
 
     @property
     def monitoring_enabled(self):

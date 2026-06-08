@@ -1,7 +1,6 @@
 """
 Head Node Application - Main Coordinator
 Handles API requests, coordinates workers, and manages training
-Uses FastAPI framework with SSL/TLS
 """
 import os
 import sys
@@ -12,7 +11,7 @@ import time
 from datetime import datetime, timedelta
 from typing import List, Dict, Optional
 from fastapi import FastAPI, HTTPException, UploadFile, File
-from fastapi.responses import JSONResponse
+from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from kafka import KafkaProducer
@@ -98,38 +97,49 @@ class StatsResponse(BaseModel):
 
 
 def initialize_kafka():
-    """Initialize Kafka producer with SSL"""
+    """Initialize Kafka producer"""
     global kafka_producer
     try:
+        kafka_options = {
+            'bootstrap_servers': config.kafka_bootstrap_servers,
+            'value_serializer': lambda v: json.dumps(v).encode('utf-8'),
+            'acks': 'all',
+            'retries': 3,
+            'security_protocol': config.kafka_security_protocol
+        }
+        if config.kafka_security_protocol.upper() == 'SSL':
+            kafka_options.update({
+                'ssl_cafile': config.kafka_security_ca_file,
+                'ssl_certfile': config.kafka_security_cert_file,
+                'ssl_keyfile': config.kafka_security_key_file,
+                'ssl_password': config.kafka_security_password,
+                'ssl_check_hostname': config.security_ssl_check_hostname
+            })
+
         kafka_producer = KafkaProducer(
-            bootstrap_servers=config.kafka_bootstrap_servers,
-            value_serializer=lambda v: json.dumps(v).encode('utf-8'),
-            acks='all',
-            retries=3,
-            security_protocol=config.kafka_security_protocol,
-            ssl_cafile=config.kafka_security_ca_file,
-            ssl_certfile=config.kafka_security_cert_file,
-            ssl_keyfile=config.kafka_security_key_file,
-            ssl_password=config.kafka_security_password
+            **kafka_options
         )
-        logger.info("Kafka producer initialized successfully with SSL")
+        logger.info(f"Kafka producer initialized successfully using {config.kafka_security_protocol}")
     except Exception as e:
         logger.error(f"Failed to initialize Kafka producer: {e}")
         raise
 
 
 def initialize_mongodb():
-    """Initialize MongoDB connection with SSL"""
+    """Initialize MongoDB connection"""
     global mongodb_client, mongodb_db
     try:
-        mongodb_client = MongoClient(
-            config.mongodb_uri,
-            ssl=config.mongodb_ssl,
-            ssl_ca_certs=config.mongodb_ca_file,
-            authSource=config.mongodb_auth_source
-        )
+        mongo_options = {'authSource': config.mongodb_auth_source}
+        if config.mongodb_ssl:
+            mongo_options.update({
+                'ssl': True,
+                'ssl_ca_certs': config.mongodb_ca_file,
+                'tlsAllowInvalidHostnames': not config.security_ssl_check_hostname
+            })
+
+        mongodb_client = MongoClient(config.mongodb_uri, **mongo_options)
         mongodb_db = mongodb_client[config.mongodb_database]
-        logger.info("MongoDB connection initialized successfully with SSL")
+        logger.info("MongoDB connection initialized successfully")
     except Exception as e:
         logger.error(f"Failed to initialize MongoDB: {e}")
         raise
@@ -323,13 +333,10 @@ async def get_file(filename: str):
         if '_id' in file_doc:
             file_doc['_id'] = str(file_doc['_id'])
 
-        return JSONResponse(
-            status_code=200,
-            content={
-                "status": "success",
-                "file": file_doc
-            }
-        )
+        return jsonable_encoder({
+            "status": "success",
+            "file": file_doc
+        })
     except HTTPException:
         raise
     except Exception as e:
@@ -381,17 +388,21 @@ def main():
 
     logger.info(f"Starting {config.system_name} v{config.system_version}")
     logger.info(f"API server running on {config.api_host}:{config.api_port}")
-    logger.info(f"SSL enabled: {config.api_ssl}")
+    logger.info(f"API TLS enabled: {config.api_ssl}")
 
-    uvicorn.run(
-        "head_node:app",
-        host=config.api_host,
-        port=config.api_port,
-        ssl_keyfile=config.api_key_file,
-        ssl_certfile=config.api_cert_file,
-        reload=config.api_debug,
-        log_level=config.logging_level.lower()
-    )
+    uvicorn_options = {
+        'host': config.api_host,
+        'port': config.api_port,
+        'reload': config.api_debug,
+        'log_level': config.logging_level.lower()
+    }
+    if config.api_ssl:
+        uvicorn_options.update({
+            'ssl_keyfile': config.api_key_file,
+            'ssl_certfile': config.api_cert_file
+        })
+
+    uvicorn.run("head_node:app", **uvicorn_options)
 
 
 if __name__ == '__main__':

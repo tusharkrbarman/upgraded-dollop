@@ -12,7 +12,7 @@ Distributes training data across 7 laptops on a local network based on device ca
 - **Fault Tolerance**: Detects and recovers from failures in <2 seconds
 - **High Availability**: 99.9% uptime with automatic failover
 - **Real-time Monitoring**: Heartbeat-based health monitoring
-- **Security**: SSL/TLS encryption
+- **Security**: MongoDB authentication for the local demo
 
 ## 🏗️ System Architecture
 
@@ -30,8 +30,8 @@ Distributes training data across 7 laptops on a local network based on device ca
 
 ### Technology Stack
 
-- **API**: FastAPI with SSL/TLS
-- **Messaging**: Apache Kafka 3.6.0 with SSL
+- **API**: FastAPI
+- **Messaging**: Apache Kafka 3.6.0
 - **Database**: MongoDB 7.0 with authentication
 - **Language**: Python 3.11
 - **OS**: Ubuntu 22.04 LTS
@@ -53,21 +53,7 @@ Distributes training data across 7 laptops on a local network based on device ca
    # Test connectivity: ping 192.168.1.10-16
    ```
 
-2. **Generate SSL Certificates** (Laptop 1)
-   ```bash
-   mkdir -p ~/ssl-certs
-   cd ~/ssl-certs
-   openssl genrsa -out ca-key.pem 4096
-   openssl req -new -x509 -days 365 -key ca-key.pem -sha256 -out ca.pem -subj "/CN=DistributedAI-CA"
-   openssl genrsa -out server-key.pem 4096
-   openssl req -new -key server-key.pem -out server.csr -subj "/CN=server"
-   openssl x509 -req -in server.csr -CA ca.pem -CAkey ca-key.pem -CAcreateserial -out server-cert.pem -days 365
-   openssl genrsa -out client-key.pem 4096
-   openssl req -new -key client-key.pem -out client.csr -subj "/CN=client"
-   openssl x509 -req -in client.csr -CA ca.pem -CAkey ca-key.pem -CAcreateserial -out client-cert.pem -days 365
-   ```
-
-3. **Deploy Services** (in order)
+2. **Deploy Services** (in order)
    ```bash
    # Laptop 7: MongoDB + Monitoring
    # Laptop 2: Kafka Broker 1
@@ -78,13 +64,13 @@ Distributes training data across 7 laptops on a local network based on device ca
    # Laptop 1: Head Node
    ```
 
-4. **Test System**
+3. **Test System**
    ```bash
    # Test API
-   curl -k https://192.168.1.10:5000/health
+   curl http://192.168.1.10:5000/health
 
    # View API docs
-   # Open browser: https://192.168.1.10:5000/docs
+   # Open browser: http://192.168.1.10:5000/docs
    ```
 
 ## 📖 Usage
@@ -117,13 +103,11 @@ import base64
 with open('image.jpg', 'rb') as f:
     img_data = base64.b64encode(f.read()).decode('utf-8')
 
-response = requests.post('https://192.168.1.10:5000/api/upload',
-    json={'name': 'image.jpg', 'img': img_data},
-    verify=False)
+response = requests.post('http://192.168.1.10:5000/api/upload',
+    json={'name': 'image.jpg', 'img': img_data})
 
 # List files
-response = requests.get('https://192.168.1.10:5000/api/files',
-    verify=False)
+response = requests.get('http://192.168.1.10:5000/api/files')
 ```
 
 ## 📁 Project Structure
@@ -158,7 +142,7 @@ Edit `config_local.yaml` to customize:
 # Network
 network:
   subnet: "192.168.1.0/24"
-  use_ssl: true
+  use_ssl: false
   use_auth: true
 
 # Kafka
@@ -167,27 +151,26 @@ kafka:
     - "192.168.1.11:9092"
     - "192.168.1.12:9092"
   security:
-    protocol: "SSL"
-    ca_file: "/etc/ssl/certs/ca.pem"
+    protocol: "PLAINTEXT"
 
 # MongoDB
 mongodb:
   uri: "mongodb://username:password@192.168.1.16:27017/"
-  ssl: true
-  auth_source: "admin"
+  ssl: false
+  auth_source: "dfs_metadata"
 
 # API
   api:
     host: "0.0.0.0"
     port: 5000
-    ssl: true
+    ssl: false
 ```
 
 ## 🎓 Educational Value
 
 Demonstrates:
 - **Distributed Systems**: Message passing, coordination, fault tolerance
-- **Security**: SSL/TLS, MongoDB auth
+- **Security**: MongoDB auth
 - **Microservices**: Service-oriented architecture
 - **Load Balancing**: Intelligent resource allocation
 - **High Availability**: Automatic failover and recovery
@@ -202,11 +185,6 @@ Demonstrates:
 - Verify IP addresses
 - Check firewall settings
 
-**SSL certificate errors**
-- Verify CA certificate distributed to all laptops
-- Check certificate paths in config
-- Verify system time is correct
-
 **MongoDB connection failed**
 - Check MongoDB is running
 - Verify authentication enabled
@@ -214,7 +192,6 @@ Demonstrates:
 
 **Kafka connection failed**
 - Verify Kafka brokers running
-- Check SSL configuration
 - Verify broker addresses
 
 ## 📚 Documentation
