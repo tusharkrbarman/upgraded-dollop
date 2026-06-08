@@ -84,6 +84,9 @@ POST /api/upload
 Content-Type: application/json
 {"name": "image.jpg", "img": "base64data"}
 
+# Upload response includes chunk metadata
+{"file_id": "...", "total_chunks": 4, "chunk_size": 262144}
+
 # List files
 GET /api/files
 

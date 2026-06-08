@@ -13,6 +13,7 @@ import threading
 from datetime import datetime, timedelta
 from kafka import KafkaConsumer
 from pymongo import MongoClient
+from bson import ObjectId
 
 # Add parent directory to path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -268,6 +269,84 @@ def process_image(file_data):
         return False
 
 
+def process_file_chunk(chunk_data):
+    """Process and store one file chunk locally."""
+    try:
+        storage_dir = os.path.join(
+            config.storage_base_path,
+            worker_id,
+            f"{os.path.basename(chunk_data['name'])}.chunks"
+        )
+        os.makedirs(storage_dir, exist_ok=True)
+
+        chunk_index = int(chunk_data['chunk_index'])
+        chunk_bytes = base64.b64decode(chunk_data['data'])
+        chunk_path = os.path.join(storage_dir, f"chunk_{chunk_index:06d}.part")
+
+        with open(chunk_path, 'wb') as f:
+            f.write(chunk_bytes)
+
+        files_collection = mongodb_db[config.mongodb_collections['files']]
+        update_result = files_collection.update_one(
+            {
+                '_id': ObjectId(chunk_data['file_id']),
+                'chunks.index': chunk_index
+            },
+            {
+                '$set': {
+                    'chunks.$.status': 'processed',
+                    'chunks.$.location': {
+                        'node_id': worker_id,
+                        'path': chunk_path
+                    },
+                    'chunks.$.processed_at': datetime.utcnow(),
+                    'updated_at': datetime.utcnow()
+                }
+            }
+        )
+
+        if update_result.matched_count == 0:
+            logger.warning(
+                f"Processed chunk {chunk_index} for {chunk_data['name']}, "
+                "but no matching metadata document was found"
+            )
+
+        logger.info(
+            f"Processed chunk {chunk_index + 1}/{chunk_data['total_chunks']} "
+            f"for {chunk_data['name']}"
+        )
+        update_file_status_if_complete(chunk_data['file_id'])
+        return True
+    except Exception as e:
+        logger.error(
+            f"Failed to process chunk {chunk_data.get('chunk_index')} "
+            f"for {chunk_data.get('name')}: {e}"
+        )
+        return False
+
+
+def update_file_status_if_complete(file_id):
+    """Mark a file complete after all chunks have been processed."""
+    try:
+        files_collection = mongodb_db[config.mongodb_collections['files']]
+        file_doc = files_collection.find_one({'_id': ObjectId(file_id)})
+        if not file_doc:
+            return
+
+        chunks = file_doc.get('chunks', [])
+        if chunks and all(chunk.get('status') == 'processed' for chunk in chunks):
+            files_collection.update_one(
+                {'_id': ObjectId(file_id)},
+                {'$set': {
+                    'status': 'complete',
+                    'completed_at': datetime.utcnow(),
+                    'updated_at': datetime.utcnow()
+                }}
+            )
+    except Exception as e:
+        logger.error(f"Failed to update completion status for file {file_id}: {e}")
+
+
 def heartbeat_thread():
     """Thread for sending heartbeats"""
     while running:
@@ -300,8 +379,11 @@ def consume_messages():
                 file_data = message.value
                 logger.info(f"Received message for file: {file_data['name']}")
 
-                # Process the image
-                success = process_image(file_data)
+                if 'chunk_index' in file_data:
+                    success = process_file_chunk(file_data)
+                else:
+                    # Backward compatibility for old whole-file messages.
+                    success = process_image(file_data)
 
                 if success:
                     logger.info(f"Successfully processed {file_data['name']}")

@@ -8,6 +8,7 @@ import json
 import base64
 import logging
 import time
+from binascii import Error as Base64Error
 from datetime import datetime, timedelta
 from typing import List, Dict, Optional
 from fastapi import FastAPI, HTTPException, UploadFile, File
@@ -77,6 +78,8 @@ class FileResponse(BaseModel):
     file_id: Optional[str] = None
     topic: Optional[str] = None
     disk_speed: Optional[int] = None
+    total_chunks: Optional[int] = None
+    chunk_size: Optional[int] = None
 
 
 class FilesListResponse(BaseModel):
@@ -175,26 +178,57 @@ def determine_worker_topic(disk_speed):
         return config.kafka_image_data_slow_topic
 
 
-def store_file_metadata(file_data, topic, worker_nodes):
+def split_into_chunks(data, chunk_size):
+    """Split bytes into fixed-size chunks."""
+    return [
+        data[index:index + chunk_size]
+        for index in range(0, len(data), chunk_size)
+    ] or [b'']
+
+
+def store_file_metadata(filename, file_size, topic, worker_nodes, total_chunks):
     """Store file metadata in MongoDB"""
     try:
         files_collection = mongodb_db[config.mongodb_collections['files']]
 
         metadata = {
-            'filename': file_data['name'],
-            'size': len(base64.b64decode(file_data['img'])),
+            'filename': filename,
+            'size': file_size,
             'topic': topic,
             'worker_nodes': worker_nodes,
+            'chunk_size': config.storage_chunk_size,
+            'total_chunks': total_chunks,
+            'chunks': [
+                {
+                    'index': index,
+                    'status': 'queued',
+                    'location': None,
+                    'processed_at': None
+                }
+                for index in range(total_chunks)
+            ],
             'created_at': datetime.utcnow(),
-            'status': 'distributed'
+            'status': 'queued'
         }
 
         result = files_collection.insert_one(metadata)
-        logger.info(f"Stored metadata for file {file_data['name']} with ID {result.inserted_id}")
+        logger.info(f"Stored metadata for file {filename} with ID {result.inserted_id}")
         return result.inserted_id
     except Exception as e:
         logger.error(f"Failed to store file metadata: {e}")
         return None
+
+
+def mark_file_status(file_id, status):
+    """Update file distribution status."""
+    try:
+        files_collection = mongodb_db[config.mongodb_collections['files']]
+        files_collection.update_one(
+            {'_id': file_id},
+            {'$set': {'status': status, 'updated_at': datetime.utcnow()}}
+        )
+    except Exception as e:
+        logger.error(f"Failed to mark file {file_id} as {status}: {e}")
 
 
 def get_file_location(filename):
@@ -273,33 +307,64 @@ async def health_check():
 async def upload_file(file_data: FileUpload):
     """Upload file endpoint"""
     try:
+        try:
+            file_bytes = base64.b64decode(file_data.img, validate=True)
+        except (Base64Error, ValueError) as e:
+            raise HTTPException(status_code=400, detail=f"Invalid base64 image data: {e}")
+
         # Determine topic based on disk speed
         disk_speed = get_disk_speed()
         topic = determine_worker_topic(disk_speed)
+        chunks = split_into_chunks(file_bytes, config.storage_chunk_size)
+        total_chunks = len(chunks)
 
-        logger.info(f"Uploading file {file_data.name} to topic {topic} (disk speed: {disk_speed} bytes/s)")
+        logger.info(
+            f"Uploading file {file_data.name} as {total_chunks} chunks to topic {topic} "
+            f"(disk speed: {disk_speed} bytes/s)"
+        )
+
+        # Store metadata before queueing chunks so workers can update locations.
+        worker_nodes = ['worker-1', 'worker-2', 'worker-3']  # Simplified for demo
+        file_id = store_file_metadata(
+            file_data.name,
+            len(file_bytes),
+            topic,
+            worker_nodes,
+            total_chunks
+        )
+        if file_id is None:
+            raise HTTPException(status_code=500, detail="Failed to store file metadata")
 
         # Send to Kafka
-        data = {
-            'name': file_data.name,
-            'img': file_data.img
-        }
-        future = kafka_producer.send(topic, data)
-        kafka_producer.flush()
-        future.get(timeout=60)
+        futures = []
+        for chunk_index, chunk in enumerate(chunks):
+            chunk_message = {
+                'file_id': str(file_id),
+                'name': file_data.name,
+                'chunk_index': chunk_index,
+                'total_chunks': total_chunks,
+                'chunk_size': len(chunk),
+                'data': base64.b64encode(chunk).decode('utf-8')
+            }
+            futures.append(kafka_producer.send(topic, chunk_message))
 
-        # Store metadata
-        worker_nodes = ['worker-1', 'worker-2', 'worker-3']  # Simplified for demo
-        file_id = store_file_metadata(data, topic, worker_nodes)
+        kafka_producer.flush()
+        for future in futures:
+            future.get(timeout=60)
+        mark_file_status(file_id, 'distributed')
 
         return FileResponse(
             status="success",
-            message="File uploaded successfully",
+            message="File chunked and queued successfully",
             file_id=str(file_id),
             topic=topic,
-            disk_speed=disk_speed
+            disk_speed=disk_speed,
+            total_chunks=total_chunks,
+            chunk_size=config.storage_chunk_size
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Failed to upload file: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -365,9 +430,23 @@ async def get_stats():
     try:
         files = get_all_files()
         workers = get_worker_status()
+        total_chunks = sum(file_doc.get('total_chunks', 0) for file_doc in files)
+        processed_chunks = sum(
+            1
+            for file_doc in files
+            for chunk in file_doc.get('chunks', [])
+            if chunk.get('status') == 'processed'
+        )
+        complete_files = len([
+            file_doc for file_doc in files
+            if file_doc.get('status') == 'complete'
+        ])
 
         stats = {
             'total_files': len(files),
+            'complete_files': complete_files,
+            'total_chunks': total_chunks,
+            'processed_chunks': processed_chunks,
             'total_workers': len(workers),
             'system_status': 'healthy',
             'timestamp': datetime.utcnow().isoformat()

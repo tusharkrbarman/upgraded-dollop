@@ -36,13 +36,14 @@ Laptop 6  MongoDB + Monitoring  192.168.1.16:27017,9999
 
 **Purpose:** Message broker for distributing work to workers.
 
-The local demo uses a single Kafka broker to avoid multi-broker cluster setup complexity.
+The local demo uses a single Kafka broker to avoid multi-broker cluster setup complexity. Uploaded files are split into chunks before being published to Kafka.
 
 **Configuration:**
 - Bootstrap server: `192.168.1.11:9092`
 - Security protocol: `PLAINTEXT`
 - Replication factor: `1`
 - Partitions: `3`
+- Upload chunk size: `256 KB`
 
 **Topics:**
 - `image-data-fast`
@@ -88,10 +89,11 @@ Security still includes:
 
 ```text
 Client -> Head Node
-Head Node -> Kafka topic
-Worker -> Kafka consume
-Worker -> Local storage
-Worker -> MongoDB file location update
+Head Node -> split file into chunks
+Head Node -> Kafka topic, one message per chunk
+Worker -> Kafka consume chunk
+Worker -> Local chunk storage
+Worker -> MongoDB chunk location update
 Worker -> Monitoring heartbeat
 Monitoring -> MongoDB worker status update
 ```
