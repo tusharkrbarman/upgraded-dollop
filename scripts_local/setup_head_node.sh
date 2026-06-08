@@ -14,6 +14,11 @@ if [ "$EUID" -ne 0 ]; then
     exit 1
 fi
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SOURCE_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+SERVICE_USER="${SUDO_USER:-user}"
+PROJECT_DIR="/home/$SERVICE_USER/projects/distributed-ai-training"
+
 # Update system
 echo "Updating system..."
 apt update && apt upgrade -y
@@ -24,8 +29,11 @@ apt install -y python3 python3-pip python3-venv
 
 # Create project directory
 echo "Creating project directory..."
-mkdir -p /home/user/projects/distributed-ai-training
-cd /home/user/projects/distributed-ai-training
+mkdir -p "$PROJECT_DIR"
+if [ "$SOURCE_DIR" != "$PROJECT_DIR" ]; then
+    cp -a "$SOURCE_DIR/." "$PROJECT_DIR/"
+fi
+cd "$PROJECT_DIR"
 
 # Create virtual environment
 echo "Creating virtual environment..."
@@ -42,10 +50,13 @@ echo "Creating directories..."
 mkdir -p storage
 mkdir -p logs
 mkdir -p data
+chown -R "$SERVICE_USER:$SERVICE_USER" "$PROJECT_DIR"
 
 # Copy configuration
 echo "Setting up configuration..."
 cp config_local.yaml config.yaml
+sed -i "s#/home/user/#/home/$SERVICE_USER/#g" config.yaml
+chown "$SERVICE_USER:$SERVICE_USER" config.yaml
 
 # Configure firewall
 echo "Configuring firewall..."
@@ -62,11 +73,11 @@ After=network.target
 
 [Service]
 Type=simple
-User=user
-WorkingDirectory=/home/user/projects/distributed-ai-training
-Environment="PATH=/home/user/projects/distributed-ai-training/venv/bin"
+User=$SERVICE_USER
+WorkingDirectory=$PROJECT_DIR
+Environment="PATH=$PROJECT_DIR/venv/bin"
 Environment="PYTHONUNBUFFERED=1"
-ExecStart=/home/user/projects/distributed-ai-training/venv/bin/python src/head_node.py
+ExecStart=$PROJECT_DIR/venv/bin/python src/head_node.py
 Restart=always
 RestartSec=10
 

@@ -1,10 +1,10 @@
 #!/bin/bash
-# Setup script for Worker 3 (Laptop 6) - Local Network Deployment
+# Setup script for Worker 3 (Laptop 5) - Local Network Deployment
 
 set -e
 
 echo "=========================================="
-echo "Setting up Worker 3 (Laptop 6)"
+echo "Setting up Worker 3 (Laptop 5)"
 echo "Local Network Deployment"
 echo "=========================================="
 
@@ -13,6 +13,11 @@ if [ "$EUID" -ne 0 ]; then
     echo "Please run as root (use sudo)"
     exit 1
 fi
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SOURCE_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+SERVICE_USER="${SUDO_USER:-user}"
+PROJECT_DIR="/home/$SERVICE_USER/projects/distributed-ai-training"
 
 # Update system
 echo "Updating system..."
@@ -24,8 +29,11 @@ apt install -y python3 python3-pip python3-venv
 
 # Create project directory
 echo "Creating project directory..."
-mkdir -p /home/user/projects/distributed-ai-training
-cd /home/user/projects/distributed-ai-training
+mkdir -p "$PROJECT_DIR"
+if [ "$SOURCE_DIR" != "$PROJECT_DIR" ]; then
+    cp -a "$SOURCE_DIR/." "$PROJECT_DIR/"
+fi
+cd "$PROJECT_DIR"
 
 # Create virtual environment
 echo "Creating virtual environment..."
@@ -42,10 +50,13 @@ echo "Creating directories..."
 mkdir -p storage/worker-3
 mkdir -p logs
 mkdir -p data
+chown -R "$SERVICE_USER:$SERVICE_USER" "$PROJECT_DIR"
 
 # Copy configuration
 echo "Setting up configuration..."
 cp config_local.yaml config.yaml
+sed -i "s#/home/user/#/home/$SERVICE_USER/#g" config.yaml
+chown "$SERVICE_USER:$SERVICE_USER" config.yaml
 
 # Configure firewall
 echo "Configuring firewall..."
@@ -65,12 +76,12 @@ After=network.target
 
 [Service]
 Type=simple
-User=user
-WorkingDirectory=/home/user/projects/distributed-ai-training
-Environment="PATH=/home/user/projects/distributed-ai-training/venv/bin"
+User=$SERVICE_USER
+WorkingDirectory=$PROJECT_DIR
+Environment="PATH=$PROJECT_DIR/venv/bin"
 Environment="PYTHONUNBUFFERED=1"
 Environment="WORKER_ID=worker-3"
-ExecStart=/home/user/projects/distributed-ai-training/venv/bin/python src/worker.py
+ExecStart=$PROJECT_DIR/venv/bin/python src/worker.py
 Restart=always
 RestartSec=10
 
@@ -104,7 +115,7 @@ echo "  sudo journalctl -u worker -f"
 echo ""
 echo "NEXT STEPS:"
 echo "1. Update config.yaml with correct IP addresses"
-echo "2. Start Kafka brokers first"
+echo "2. Start the Kafka broker first"
 echo "3. Start MongoDB"
 echo "4. Then start this worker"
 echo "5. Verify worker is consuming messages from Kafka"

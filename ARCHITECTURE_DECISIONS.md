@@ -40,7 +40,7 @@ Use Apache Kafka instead of RabbitMQ, Redis Streams, or raw sockets.
 
 **Rationale:**
 - **Persistence:** Messages are persisted to disk, survive crashes
-- **Partitioning:** Built-in data partitioning across multiple brokers
+- **Partitioning:** Built-in topic partitioning for worker load distribution
 - **Consumer groups:** Automatic load balancing across workers
 - **Replay capability:** Can re-read messages if worker fails
 - **Throughput:** Optimized for high-volume data streaming
@@ -50,7 +50,7 @@ Use Apache Kafka instead of RabbitMQ, Redis Streams, or raw sockets.
 - Requires Zookeeper (or KRaft in newer versions)
 - More complex deployment than Redis
 - Significant memory and disk usage
-- Needs at least 2 brokers for HA
+- Single-broker demo mode is not highly available
 
 ---
 
@@ -164,7 +164,7 @@ Use static IP addresses configured in YAML files.
 **Rationale:**
 - **Simplicity:** No additional infrastructure needed
 - **Predictability:** IPs never change, easy to debug
-- **Assignment scope:** 7 laptops on one hotspot, no dynamic scaling
+- **Assignment scope:** Local demo on one hotspot, no dynamic scaling
 - **No dependencies:** Doesn't require DHCP server configuration
 
 **Consequences:**
@@ -175,28 +175,29 @@ Use static IP addresses configured in YAML files.
 
 ---
 
-## ADR-008: 7-Node Topology (1 Head + 2 Kafka + 3 Workers + 1 MongoDB)
+## ADR-008: Demo Topology (1 Head + 1 Kafka + 3 Workers + 1 MongoDB)
 
 **Status:** ✅ Accepted
 
 **Context:**
-We have exactly 7 laptops available for this assignment. Need to allocate roles optimally.
+We need a topology that is reliable to deploy for a local demo.
 
 **Decision:**
 - 1 Head Node (FastAPI API + coordination)
-- 2 Kafka Brokers (HA message broker)
+- 1 Kafka Broker (simplified demo message broker)
 - 3 Workers (Fast/Medium/Slow for load balancing demo)
 - 1 MongoDB + Monitoring (combined to save a laptop)
 
 **Rationale:**
 - **Head node separation:** Dedicated API prevents resource contention
-- **2 Kafka brokers:** Minimum for HA (survives 1 broker failure)
+- **1 Kafka broker:** Simpler and more reliable for demo setup
 - **3 workers:** Demonstrates load balancing across different capabilities
-- **Combined MongoDB + monitoring:** Fits within 7-laptop constraint
+- **Combined MongoDB + monitoring:** Reduces hardware needed
 
 **Consequences:**
 - MongoDB and monitoring share resources
 - No dedicated monitoring laptop
+- If the Kafka laptop fails, messaging stops
 - If MongoDB laptop fails, monitoring also fails
 - Cannot easily add more workers without more hardware
 
@@ -334,7 +335,7 @@ Provide separate bash setup scripts for each role (`setup_head_node.sh`, `setup_
 | 005 | Disable Local TLS | ✅ Accepted | Medium |
 | 006 | No JWT Auth | ✅ Accepted | Low |
 | 007 | Static IPs | ✅ Accepted | Medium |
-| 008 | 7-Node Topology | ✅ Accepted | High |
+| 008 | Demo Topology | ✅ Accepted | High |
 | 009 | Disk Speed LB | ✅ Accepted | Medium |
 | 010 | Base64 Images | ✅ Accepted | Low |
 | 011 | Python 3.11 | ✅ Accepted | High |

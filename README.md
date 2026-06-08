@@ -4,29 +4,28 @@ A distributed system that enables ML model training on large datasets across mul
 
 ## 🎯 Overview
 
-Distributes training data across 7 laptops on a local network based on device capabilities, with fault tolerance and real-time monitoring.
+Distributes training data across 6 laptops on a local network based on device capabilities, with fault tolerance and real-time monitoring.
 
 ## ✨ Key Features
 
 - **Intelligent Load Balancing**: Distributes data based on disk I/O speed
-- **Fault Tolerance**: Detects and recovers from failures in <2 seconds
-- **High Availability**: 99.9% uptime with automatic failover
+- **Fault Monitoring**: Detects worker failures with heartbeat checks
+- **Demo-Ready Topology**: Single Kafka broker for simpler local setup
 - **Real-time Monitoring**: Heartbeat-based health monitoring
 - **Security**: MongoDB authentication for the local demo
 
 ## 🏗️ System Architecture
 
-### 7 Laptops on Local Network (192.168.1.0/24)
+### 6 Laptops on Local Network (192.168.1.0/24)
 
 | Laptop | Role | IP Address | Purpose |
 |--------|------|------------|---------|
 | 1 | Head Node | 192.168.1.10 | Coordination & API |
 | 2 | Kafka Broker 1 | 192.168.1.11 | Message broker |
-| 3 | Kafka Broker 2 | 192.168.1.12 | Message broker |
-| 4 | Worker 1 (Fast) | 192.168.1.13 | Data processing |
-| 5 | Worker 2 (Medium) | 192.168.1.14 | Data processing |
-| 6 | Worker 3 (Slow) | 192.168.1.15 | Data processing |
-| 7 | MongoDB + Monitoring | 192.168.1.16 | Metadata & monitoring |
+| 3 | Worker 1 (Fast) | 192.168.1.13 | Data processing |
+| 4 | Worker 2 (Medium) | 192.168.1.14 | Data processing |
+| 5 | Worker 3 (Slow) | 192.168.1.15 | Data processing |
+| 6 | MongoDB + Monitoring | 192.168.1.16 | Metadata & monitoring |
 
 ### Technology Stack
 
@@ -40,10 +39,10 @@ Distributes training data across 7 laptops on a local network based on device ca
 
 ### Prerequisites
 
-- 7 laptops on same local network
+- 6 laptops on same local network
 - Python 3.11+ installed
 - Java 11+ (for Kafka)
-- MongoDB 7.0 (Laptop 7)
+- MongoDB 7.0 (Laptop 6)
 
 ### Deployment Steps
 
@@ -55,12 +54,11 @@ Distributes training data across 7 laptops on a local network based on device ca
 
 2. **Deploy Services** (in order)
    ```bash
-   # Laptop 7: MongoDB + Monitoring
+   # Laptop 6: MongoDB + Monitoring
    # Laptop 2: Kafka Broker 1
-   # Laptop 3: Kafka Broker 2
-   # Laptop 4: Worker 1
-   # Laptop 5: Worker 2
-   # Laptop 6: Worker 3
+   # Laptop 3: Worker 1
+   # Laptop 4: Worker 2
+   # Laptop 5: Worker 3
    # Laptop 1: Head Node
    ```
 
@@ -122,7 +120,6 @@ distributed-ai-training/
 ├── scripts_local/            # Setup scripts
 │   ├── setup_head_node.sh
 │   ├── setup_kafka_broker_1.sh
-│   ├── setup_kafka_broker_2.sh
 │   ├── setup_worker_1.sh
 │   ├── setup_worker_2.sh
 │   ├── setup_worker_3.sh
@@ -149,7 +146,6 @@ network:
 kafka:
   bootstrap_servers:
     - "192.168.1.11:9092"
-    - "192.168.1.12:9092"
   security:
     protocol: "PLAINTEXT"
 
@@ -173,7 +169,7 @@ Demonstrates:
 - **Security**: MongoDB auth
 - **Microservices**: Service-oriented architecture
 - **Load Balancing**: Intelligent resource allocation
-- **High Availability**: Automatic failover and recovery
+- **Demo Reliability**: Simple topology that is easier to deploy and debug
 - **Real-time Monitoring**: Health checks and alerting
 
 ## 🔍 Troubleshooting
@@ -191,7 +187,7 @@ Demonstrates:
 - Check username/password
 
 **Kafka connection failed**
-- Verify Kafka brokers running
+- Verify Kafka broker is running
 - Verify broker addresses
 
 ## 📚 Documentation

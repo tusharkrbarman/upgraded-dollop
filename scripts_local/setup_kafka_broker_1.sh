@@ -14,6 +14,8 @@ if [ "$EUID" -ne 0 ]; then
     exit 1
 fi
 
+SERVICE_USER="${SUDO_USER:-user}"
+
 # Update system
 echo "Updating system..."
 apt update && apt upgrade -y
@@ -39,7 +41,7 @@ mv kafka_2.13-3.6.0 /opt/kafka
 # Create Kafka data directory
 echo "Creating Kafka data directory..."
 mkdir -p /var/kafka/data
-chown -R user:user /var/kafka
+chown -R "$SERVICE_USER:$SERVICE_USER" /var/kafka
 
 # Configure Kafka
 echo "Configuring Kafka..."
@@ -49,7 +51,7 @@ listeners=PLAINTEXT://:9092
 advertised.listeners=PLAINTEXT://192.168.1.11:9092
 log.dirs=/var/kafka/data
 num.partitions=3
-default.replication.factor=2
+default.replication.factor=1
 min.insync.replicas=1
 log.retention.hours=168
 zookeeper.connect=localhost:2181
@@ -58,7 +60,7 @@ EOF
 # Configure Zookeeper
 echo "Configuring Zookeeper..."
 mkdir -p /var/zookeeper/data
-chown -R user:user /var/zookeeper
+chown -R "$SERVICE_USER:$SERVICE_USER" /var/zookeeper
 
 echo "1" > /var/zookeeper/data/myid
 
@@ -88,7 +90,7 @@ After=network.target
 
 [Service]
 Type=simple
-User=user
+User=$SERVICE_USER
 ExecStart=/opt/kafka/bin/zookeeper-server-start.sh /opt/kafka/config/zookeeper.properties
 Restart=always
 RestartSec=10
@@ -106,7 +108,7 @@ After=network.target zookeeper.service
 
 [Service]
 Type=simple
-User=user
+User=$SERVICE_USER
 ExecStart=/opt/kafka/bin/kafka-server-start.sh /opt/kafka/config/server.properties
 Restart=always
 RestartSec=10

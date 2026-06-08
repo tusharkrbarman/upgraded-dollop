@@ -1,17 +1,17 @@
 # Deployment Guide
 
-Step-by-step guide to deploy the distributed AI training system on 7 laptops.
+Step-by-step guide to deploy the distributed AI training system on 6 laptops.
 
 ## 📋 Prerequisites
 
 ### Hardware
-- 7 laptops on same local network (192.168.1.0/24)
+- 6 laptops on same local network (192.168.1.0/24)
 - Each laptop: 2+ CPU cores, 4GB+ RAM, 20GB+ storage
 
 ### Software
 - Python 3.11+ (all laptops)
-- Java 11+ (Laptops 2, 3)
-- MongoDB 7.0 (Laptop 7)
+- Java 11+ (Laptop 2)
+- MongoDB 7.0 (Laptop 6)
 - Ubuntu 22.04 LTS (recommended)
 
 ### Network
@@ -50,9 +50,9 @@ sudo netplan apply
 # Allow required ports
 sudo ufw allow 22/tcp      # SSH
 sudo ufw allow 5000/tcp    # API (Laptop 1)
-sudo ufw allow 9092/tcp    # Kafka (Laptops 2,3)
-sudo ufw allow 27017/tcp   # MongoDB (Laptop 7)
-sudo ufw allow 9999/udp    # Heartbeat (Laptops 4,5,6,7)
+sudo ufw allow 9092/tcp    # Kafka (Laptop 2)
+sudo ufw allow 27017/tcp   # MongoDB (Laptop 6)
+sudo ufw allow 9999/udp    # Heartbeat (worker laptops and monitoring)
 sudo ufw enable
 ```
 
@@ -62,14 +62,13 @@ sudo ufw enable
 # From each laptop, test connectivity
 ping 192.168.1.10
 ping 192.168.1.11
-ping 192.168.1.12
 ping 192.168.1.13
 ping 192.168.1.14
 ping 192.168.1.15
 ping 192.168.1.16
 ```
 
-### Step 2: Setup MongoDB (Laptop 7)
+### Step 2: Setup MongoDB (Laptop 6)
 
 ```bash
 # Install MongoDB
@@ -106,9 +105,7 @@ db.createUser({
 
 ```
 
-### Step 3: Setup Kafka Brokers (Laptops 2, 3)
-
-#### Laptop 2 (Broker 1)
+### Step 3: Setup Kafka Broker (Laptop 2)
 
 ```bash
 # Install Java
@@ -140,15 +137,7 @@ advertised.listeners=PLAINTEXT://192.168.1.11:9092
 ~/kafka/bin/kafka-server-start.sh -daemon ~/kafka/config/server.properties
 ```
 
-#### Laptop 3 (Broker 2)
-
-```bash
-# Same as Laptop 2, but with:
-broker.id=2
-advertised.listeners=PLAINTEXT://192.168.1.12:9092
-```
-
-### Step 4: Setup Workers (Laptops 4, 5, 6)
+### Step 4: Setup Workers (Laptops 3, 4, 5)
 
 ```bash
 # Install Python
@@ -200,7 +189,7 @@ nano config_local.yaml
 python src/head_node.py
 ```
 
-### Step 6: Setup Monitoring (Laptop 7)
+### Step 6: Setup Monitoring (Laptop 6)
 
 ```bash
 # Already have Python and MongoDB installed
@@ -218,7 +207,6 @@ python src/monitoring.py
 
 # Test Kafka
 telnet 192.168.1.11 9092
-telnet 192.168.1.12 9092
 
 # Test MongoDB
 mongosh "mongodb://appuser:your-password@192.168.1.16:27017/dfs_metadata?authSource=dfs_metadata"
@@ -270,12 +258,12 @@ sudo systemctl status <service-name>
 ## 📋 Deployment Checklist
 
 ### Before Deployment
-- [ ] 7 laptops available
+- [ ] 6 laptops available
 - [ ] All laptops on same network
 - [ ] Static IPs configured
 - [ ] Python 3.11+ installed
-- [ ] Java 11+ installed (Laptops 2,3)
-- [ ] MongoDB installed (Laptop 7)
+- [ ] Java 11+ installed (Laptop 2)
+- [ ] MongoDB installed (Laptop 6)
 
 ### Network Setup
 - [ ] All laptops can ping each other
@@ -284,14 +272,14 @@ sudo systemctl status <service-name>
 
 ### Security Setup
 - [ ] MongoDB authentication configured
-- [ ] Kafka brokers configured
+- [ ] Kafka broker configured
 
 ### Service Deployment
-- [ ] MongoDB running (Laptop 7)
-- [ ] Kafka brokers running (Laptops 2,3)
-- [ ] Workers running (Laptops 4,5,6)
+- [ ] MongoDB running (Laptop 6)
+- [ ] Kafka broker running (Laptop 2)
+- [ ] Workers running (Laptops 3,4,5)
 - [ ] Head node running (Laptop 1)
-- [ ] Monitoring running (Laptop 7)
+- [ ] Monitoring running (Laptop 6)
 
 ### Testing
 - [ ] Connectivity tests passed
@@ -300,7 +288,7 @@ sudo systemctl status <service-name>
 
 ## 🎯 Success Criteria
 
-✅ All 7 laptops communicate
+✅ All 6 laptops communicate
 ✅ Data flows correctly
 ✅ Security implemented for local demo (MongoDB auth)
 ✅ Fault tolerance working

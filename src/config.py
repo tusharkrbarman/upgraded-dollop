@@ -83,7 +83,7 @@ class Config:
 
     @property
     def kafka_replication_factor(self):
-        return self.get('kafka.replication_factor', 2)
+        return self.get('kafka.replication_factor', 1)
 
     @property
     def kafka_partitions(self):
